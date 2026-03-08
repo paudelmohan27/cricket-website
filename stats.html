@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stats — CricVerse</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<nav id="navbar">
+  <a href="index.html" class="nav-logo">CRIC<span>VERSE</span> <span class="dot"></span></a>
+  <ul class="nav-links" id="navLinks">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="stats.html" class="active">Stats</a></li>
+    <li><a href="about.html">About</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <button class="hamburger" id="hamburger" aria-label="Menu"><span></span><span></span><span></span></button>
+</nav>
+
+<div class="stats-header">
+  <div class="section-label">ICC Rankings</div>
+  <h1 class="section-title">PLAYER <em>STATS</em></h1>
+  <p class="section-sub">Live ICC player rankings powered by cricapi.com. Updated after every series.</p>
+</div>
+
+<section>
+  <div class="tabs-row">
+    <div class="stats-tabs" id="formatTabs">
+      <button class="tab-btn active" data-format="test">Test</button>
+      <button class="tab-btn" data-format="odi">ODI</button>
+      <button class="tab-btn" data-format="t20">T20I</button>
+    </div>
+    <div class="stats-tabs" id="roleTabs">
+      <button class="tab-btn active" data-role="batsmen">Batting</button>
+      <button class="tab-btn" data-role="bowlers">Bowling</button>
+      <button class="tab-btn" data-role="allrounders">All-Rounder</button>
+    </div>
+  </div>
+
+  <div id="rankingsWrap">
+    <!-- populated by JS -->
+  </div>
+</section>
+
+<!-- SERIES STATS -->
+<section style="background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+  <div class="section-label">Match Info</div>
+  <h2 class="section-title">RECENT <em>SCORECARD</em></h2>
+  <p class="section-sub">Match scorecard info from recent completed matches.</p>
+  <div id="scorecardWrap"><!-- JS --></div>
+</section>
+
+<footer>
+  <a href="index.html" class="footer-logo">CRIC<span>VERSE</span></a>
+  <ul class="footer-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="stats.html">Stats</a></li>
+    <li><a href="about.html">About</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <span class="footer-copy">© 2025 CricVerse · Data: cricapi.com</span>
+</footer>
+
+<script src="script.js"></script>
+<script>
+
+let currentFormat = 'test';
+let currentRole   = 'batsmen';
+
+const rankClass = i => i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+
+function initials(name) {
+  return (name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function renderRankings(players) {
+  if (!players || !players.length) return errorHTML('No ranking data available');
+
+  const heads = {
+    batsmen:    ['Rank', 'Player', 'Rating', 'Country', '', ''],
+    bowlers:    ['Rank', 'Player', 'Rating', 'Country', '', ''],
+    allrounders:['Rank', 'Player', 'Rating', 'Country', '', ''],
+  };
+
+  return `
+    <div class="leaderboard">
+      <div class="lb-head">
+        <span>#</span><span>Player</span>
+        <span style="text-align:right">Rating</span>
+        <span style="text-align:right">Country</span>
+        <span></span><span></span>
+      </div>
+      ${players.slice(0, 20).map((p, i) => `
+        <div class="lb-row" style="animation-delay:${i * 0.04}s">
+          <span class="lb-rank ${rankClass(i)}">${p.rank || i + 1}</span>
+          <div class="lb-player">
+            <div class="lb-avatar">${initials(p.name)}</div>
+            <div>
+              <div class="lb-name">${p.name || '—'}</div>
+              <div class="lb-country">${p.country || '—'}</div>
+            </div>
+          </div>
+          <div class="lb-val highlight" style="text-align:right">${p.rating || '—'}</div>
+          <div class="lb-val" style="text-align:right">${p.country || '—'}</div>
+          <div></div><div></div>
+        </div>`).join('')}
+    </div>`;
+}
+
+const wrap = document.getElementById('rankingsWrap');
+
+async function loadRankings() {
+  wrap.innerHTML = loadingHTML('Fetching ICC rankings');
+  if (API_KEY === 'YOUR_CRICAPI_KEY') { wrap.innerHTML = apiKeyNote(); return; }
+  try {
+    const data = await fetchCricAPI('stats', { type: currentRole, matchType: currentFormat });
+    const players = data.data || [];
+    wrap.innerHTML = renderRankings(players);
+  } catch (e) {
+    wrap.innerHTML = errorHTML('Could not load rankings · ' + e.message, 'loadRankings');
+    window.loadRankings = loadRankings;
+  }
+}
+
+window.loadRankings = loadRankings;
+
+// Tabs
+document.querySelectorAll('#formatTabs .tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#formatTabs .tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFormat = btn.dataset.format;
+    loadRankings();
+  });
+});
+document.querySelectorAll('#roleTabs .tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#roleTabs .tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentRole = btn.dataset.role;
+    loadRankings();
+  });
+});
+
+// Scorecard section - recent matches info
+const scWrap = document.getElementById('scorecardWrap');
+async function loadScorecards() {
+  scWrap.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.5px" id="scGrid">${loadingHTML()}</div>`;
+  if (API_KEY === 'YOUR_CRICAPI_KEY') { scWrap.innerHTML = apiKeyNote(); return; }
+  try {
+    const data = await fetchCricAPI('matches', { offset: 0 });
+    const matches = (data.data || []).filter(m => m.matchEnded).slice(0, 6);
+    if (!matches.length) { scWrap.innerHTML = errorHTML('No completed matches found'); return; }
+    scWrap.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.5px">` +
+      matches.map(m => {
+        const t1 = m.teams?.[0] || 'TBA', t2 = m.teams?.[1] || 'TBA';
+        const s1 = m.score?.[0] ? `${m.score[0].r}/${m.score[0].w} (${m.score[0].o})` : '—';
+        const s2 = m.score?.[1] ? `${m.score[1].r}/${m.score[1].w} (${m.score[1].o})` : '—';
+        return `<div class="match-card" style="padding:1.8rem">
+          <div class="match-status completed">✓ Completed</div>
+          <div style="font-weight:600;margin-bottom:.5rem">${t1} vs ${t2}</div>
+          <div style="font-size:.85rem;color:var(--muted);font-family:var(--font-cond);letter-spacing:1px;margin-bottom:.5rem">
+            ${t1}: ${s1}<br>${t2}: ${s2}
+          </div>
+          <div style="font-size:.8rem;color:var(--accent)">${m.status || ''}</div>
+        </div>`;
+      }).join('') + `</div>`;
+    observeCards();
+  } catch (e) {
+    scWrap.innerHTML = errorHTML('Could not load scorecards · ' + e.message);
+  }
+}
+
+loadRankings();
+loadScorecards();
+</script>
+</body>
+</html>

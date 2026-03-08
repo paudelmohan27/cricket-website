@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact — CricVerse</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<nav id="navbar">
+  <a href="index.html" class="nav-logo">CRIC<span>VERSE</span> <span class="dot"></span></a>
+  <ul class="nav-links" id="navLinks">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="stats.html">Stats</a></li>
+    <li><a href="about.html">About</a></li>
+    <li><a href="contact.html" class="active">Contact</a></li>
+  </ul>
+  <button class="hamburger" id="hamburger" aria-label="Menu"><span></span><span></span><span></span></button>
+</nav>
+
+<div class="contact-wrap">
+  <div class="contact-left">
+    <div class="section-label" style="margin-bottom:1.5rem">Reach Out</div>
+    <h1>LET'S<br><span>TALK</span><br>CRICKET</h1>
+    <p>Found a bug, have a suggestion, or want to contribute? We'd love to hear from you. CricVerse is community-first.</p>
+    <div class="contact-info">
+      <div class="contact-info-item">
+        <div class="contact-icon">📧</div>
+        <div class="contact-info-text"><strong>Email</strong>hello@cricverse.com</div>
+      </div>
+      <div class="contact-info-item">
+        <div class="contact-icon">🐙</div>
+        <div class="contact-info-text"><strong>GitHub</strong>github.com/paudelmohan27</div>
+      </div>
+      <div class="contact-info-item">
+        <div class="contact-icon">🌐</div>
+        <div class="contact-info-text"><strong>Website</strong>mohanpaudel761.com.np</div>
+      </div>
+      <div class="contact-info-item">
+        <div class="contact-icon">📍</div>
+        <div class="contact-info-text"><strong>Location</strong>Nepal 🇳🇵 — Available Worldwide</div>
+      </div>
+    </div>
+    <div style="margin-top:3rem;padding:1.5rem;background:rgba(0,229,255,0.04);border:1px solid rgba(0,229,255,0.12);border-radius:2px">
+      <div style="font-family:var(--font-cond);font-size:.7rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:.8rem">Open Source</div>
+      <p style="font-size:.875rem;color:var(--muted)">CricVerse is open source. Fork it on GitHub, submit a PR, or just drop a star if you like the project.</p>
+    </div>
+  </div>
+
+  <div class="contact-right">
+    <h2>SEND A MESSAGE</h2>
+    <div id="formWrap">
+      <div class="form-row">
+        <div class="form-group">
+          <label>First Name</label>
+          <input type="text" id="fname" placeholder="Your name">
+        </div>
+        <div class="form-group">
+          <label>Last Name</label>
+          <input type="text" id="lname" placeholder="Last name">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" id="email" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label>Subject</label>
+        <select id="subject">
+          <option value="" disabled selected>Select a topic…</option>
+          <option>Bug Report</option>
+          <option>Feature Request</option>
+          <option>Data Correction</option>
+          <option>Stream Issue</option>
+          <option>Partnership</option>
+          <option>Just saying hi 👋</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Message</label>
+        <textarea id="message" placeholder="Tell us what's on your mind…"></textarea>
+      </div>
+      <div style="margin-top:1.5rem">
+        <button class="btn-submit" id="submitBtn" onclick="handleSubmit()">Send Message →</button>
+      </div>
+    </div>
+
+    <div id="successMsg" style="display:none;text-align:center;padding:4rem 2rem">
+      <div style="font-size:3rem;margin-bottom:1.5rem">✅</div>
+      <div style="font-family:var(--font-display);font-size:2.5rem;letter-spacing:2px;margin-bottom:1rem">MESSAGE SENT!</div>
+      <p style="color:var(--muted)">Thanks for reaching out. We'll get back to you soon.</p>
+      <button class="btn btn-ghost" style="margin-top:2rem" onclick="resetForm()">Send Another</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <a href="index.html" class="footer-logo">CRIC<span>VERSE</span></a>
+  <ul class="footer-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="stats.html">Stats</a></li>
+    <li><a href="about.html">About</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <span class="footer-copy">© 2025 CricVerse. All rights reserved.</span>
+</footer>
+
+<script src="script.js"></script>
+<script>
+function handleSubmit() {
+  const fname   = document.getElementById('fname').value.trim();
+  const email   = document.getElementById('email').value.trim();
+  const message = document.getElementById('message').value.trim();
+  const btn     = document.getElementById('submitBtn');
+  if (!fname || !email || !message) {
+    btn.style.animation = 'shake 0.4s';
+    btn.textContent = 'Please fill required fields';
+    setTimeout(() => { btn.style.animation = ''; btn.textContent = 'Send Message →'; }, 1800);
+    return;
+  }
+  document.getElementById('formWrap').style.display = 'none';
+  document.getElementById('successMsg').style.display = 'block';
+}
+function resetForm() {
+  document.getElementById('formWrap').style.display = 'block';
+  document.getElementById('successMsg').style.display = 'none';
+  ['fname','lname','email','message'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('subject').selectedIndex = 0;
+}
+</script>
+<style>
+@keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }
+</style>
+</body>
+</html>

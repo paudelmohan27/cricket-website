@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stats — CricVerse</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<nav id="navbar">
+  <a href="index.html" class="nav-logo">CRIC<span>VERSE</span> <span class="dot"></span></a>
+  <ul class="nav-links" id="navLinks">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="stats.html" class="active">Stats</a></li>
+    <li><a href="about.html">About</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <button class="hamburger" id="hamburger" aria-label="Menu"><span></span><span></span><span></span></button>
+</nav>
+
+<div class="stats-header">
+  <div class="section-label">ICC Rankings</div>
+  <h1 class="section-title">PLAYER <em>STATS</em></h1>
+  <p class="section-sub">Live ICC player rankings powered by cricapi.com. Updated after every series.</p>
+</div>
+
+<section>
+  <div class="tabs-row">
+    <div class="stats-tabs" id="formatTabs">
+      <button class="tab-btn active" data-format="test">Test</button>
+      <button class="tab-btn" data-format="odi">ODI</button>
+      <button class="tab-btn" data-format="t20">T20I</button>
+    </div>
+    <div class="stats-tabs" id="roleTabs">
+      <button class="tab-btn active" data-role="batsmen">Batting</button>
+      <button class="tab-btn" data-role="bowlers">Bowling</button>
+      <button class="tab-btn" data-role="allrounders">All-Rounder</button>
+    </div>
+  </div>
+
+  <div id="rankingsWrap">
+    <!-- populated by JS -->
+  </div>
+</section>
+
+<!-- SERIES STATS -->
+<section style="background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+  <div class="section-label">Match Info</div>
+  <h2 class="section-title">RECENT <em>SCORECARD</em></h2>
+  <p class="section-sub">Match scorecard info from recent completed matches.</p>
+  <div id="scorecardWrap"><!-- JS --></div>
+</section>
+
+<footer>
+  <a href="index.html" class="footer-logo">CRIC<span>VERSE</span></a>
+  <ul class="footer-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="stats.html">Stats</a></li>
+    <li><a href="about.html">About</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <span class="footer-copy">© 2025 CricVerse · Data: cricapi.com</span>
+</footer>
+
+<script src="script.js"></script>
+<script>
+
+var currentFormat = 'test';
+var currentRole   = 'batsmen';
+
+function rankClass(i) { return i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : ''; }
+
+function initials(name) {
+  return (name || '?').split(' ').map(function(w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
+}
+
+// Cricbuzz /stats/v1/rankings/{role}?formatType={test|odi|t20} returns:
+// { rank: [ { rank, name, country, rating, points, lastUpdatedOn } ] }
+function renderRankings(players) {
+  if (!players || !players.length) return errorHTML('No ranking data available');
+  var rows = players.slice(0, 20).map(function(p, i) {
+    return '<div class="lb-row" style="animation-delay:' + (i * 0.04) + 's">'
+      + '<span class="lb-rank ' + rankClass(i) + '">' + (p.rank || i + 1) + '</span>'
+      + '<div class="lb-player">'
+        + '<div class="lb-avatar">' + initials(p.name) + '</div>'
+        + '<div>'
+          + '<div class="lb-name">' + (p.name || '—') + '</div>'
+          + '<div class="lb-country">' + (p.country || '—') + '</div>'
+        + '</div>'
+      + '</div>'
+      + '<div class="lb-val highlight" style="text-align:right">' + (p.rating || '—') + '</div>'
+      + '<div class="lb-val" style="text-align:right">' + (p.points || '—') + '</div>'
+      + '<div class="lb-val" style="text-align:right;color:var(--muted);font-size:.8rem">'
+        + (p.lastUpdatedOn ? new Date(p.lastUpdatedOn * 1000).toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : '—')
+        + '</div>'
+      + '<div></div>'
+      + '</div>';
+  }).join('');
+
+  return '<div class="leaderboard">'
+    + '<div class="lb-head">'
+    + '<span>#</span><span>Player</span>'
+    + '<span style="text-align:right">Rating</span>'
+    + '<span style="text-align:right">Points</span>'
+    + '<span style="text-align:right">Updated</span>'
+    + '<span></span>'
+    + '</div>'
+    + rows + '</div>';
+}
+
+function loadRankings() {
+  var wrap = document.getElementById('rankingsWrap');
+  if (!wrap) return;
+  wrap.innerHTML = loadingHTML('Fetching ICC rankings');
+
+  if (RAPIDAPI_KEY === 'YOUR_NEW_RAPIDAPI_KEY') { wrap.innerHTML = apiKeyNote(); return; }
+
+  fetchRankings(currentRole, currentFormat).then(function(data) {
+    var players = data.rank || [];
+    wrap.innerHTML = renderRankings(players);
+  }).catch(function(e) {
+    wrap.innerHTML = errorHTML('Could not load rankings · ' + e.message, 'loadRankings');
+  });
+}
+
+// Recent completed matches via Cricbuzz
+function loadScorecards() {
+  var scWrap = document.getElementById('scorecardWrap');
+  if (!scWrap) return;
+
+  if (RAPIDAPI_KEY === 'YOUR_NEW_RAPIDAPI_KEY') { scWrap.innerHTML = apiKeyNote(); return; }
+
+  scWrap.innerHTML = loadingHTML('Fetching recent matches');
+
+  fetchRecentMatches().then(function(data) {
+    var matches = [];
+    var types   = data.typeMatches || [];
+    for (var i = 0; i < types.length; i++) {
+      var series = types[i].seriesMatches || [];
+      for (var j = 0; j < series.length; j++) {
+        var wrap2 = series[j].seriesAdWrapper || series[j];
+        var arr   = wrap2.matches || [];
+        for (var k = 0; k < arr.length; k++) matches.push(arr[k]);
+      }
+    }
+    matches = matches.slice(0, 6);
+
+    if (!matches.length) { scWrap.innerHTML = errorHTML('No recent matches found'); return; }
+
+    scWrap.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.5px">'
+      + matches.map(function(m) {
+          var info  = m.matchInfo  || {};
+          var score = m.matchScore || {};
+          var t1 = (info.team1 && (info.team1.teamSName || info.team1.teamName)) || 'TBA';
+          var t2 = (info.team2 && (info.team2.teamSName || info.team2.teamName)) || 'TBA';
+          var s1 = score.team1Score && score.team1Score.inngs1
+            ? score.team1Score.inngs1.runs + '/' + score.team1Score.inngs1.wickets + ' (' + score.team1Score.inngs1.overs + ')'
+            : '—';
+          var s2 = score.team2Score && score.team2Score.inngs1
+            ? score.team2Score.inngs1.runs + '/' + score.team2Score.inngs1.wickets + ' (' + score.team2Score.inngs1.overs + ')'
+            : '—';
+          var result = info.status || '';
+          return '<div class="match-card" style="padding:1.8rem">'
+            + '<div class="match-status completed">✓ Completed</div>'
+            + '<div style="font-weight:600;margin-bottom:.6rem">' + t1 + ' vs ' + t2 + '</div>'
+            + '<div style="font-size:.85rem;color:var(--muted);font-family:var(--font-cond);letter-spacing:1px;margin-bottom:.6rem;line-height:1.6">'
+            + t1 + ': ' + s1 + '<br>' + t2 + ': ' + s2 + '</div>'
+            + '<div style="font-size:.8rem;color:var(--accent)">' + result + '</div>'
+            + '</div>';
+        }).join('')
+      + '</div>';
+    observeCards();
+  }).catch(function(e) {
+    scWrap.innerHTML = errorHTML('Could not load scorecards · ' + e.message);
+  });
+}
+
+window.loadRankings = loadRankings;
+
+document.addEventListener('DOMContentLoaded', function() {
+  loadRankings();
+  loadScorecards();
+
+  // Format tabs
+  document.querySelectorAll('#formatTabs .tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('#formatTabs .tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      currentFormat = btn.dataset.format;
+      loadRankings();
+    });
+  });
+
+  // Role tabs
+  document.querySelectorAll('#roleTabs .tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('#roleTabs .tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      currentRole = btn.dataset.role;
+      loadRankings();
+    });
+  });
+});
+</script>
+</body>
+</html>
