@@ -66,115 +66,142 @@
 <script src="script.js"></script>
 <script>
 
-let currentFormat = 'test';
-let currentRole   = 'batsmen';
+var currentFormat = 'test';
+var currentRole   = 'batsmen';
 
-const rankClass = i => i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+function rankClass(i) { return i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : ''; }
 
 function initials(name) {
-  return (name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  return (name || '?').split(' ').map(function(w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
 }
 
+// Cricbuzz /stats/v1/rankings/{role}?formatType={test|odi|t20} returns:
+// { rank: [ { rank, name, country, rating, points, lastUpdatedOn } ] }
 function renderRankings(players) {
   if (!players || !players.length) return errorHTML('No ranking data available');
+  var rows = players.slice(0, 20).map(function(p, i) {
+    return '<div class="lb-row" style="animation-delay:' + (i * 0.04) + 's">'
+      + '<span class="lb-rank ' + rankClass(i) + '">' + (p.rank || i + 1) + '</span>'
+      + '<div class="lb-player">'
+        + '<div class="lb-avatar">' + initials(p.name) + '</div>'
+        + '<div>'
+          + '<div class="lb-name">' + (p.name || '—') + '</div>'
+          + '<div class="lb-country">' + (p.country || '—') + '</div>'
+        + '</div>'
+      + '</div>'
+      + '<div class="lb-val highlight" style="text-align:right">' + (p.rating || '—') + '</div>'
+      + '<div class="lb-val" style="text-align:right">' + (p.points || '—') + '</div>'
+      + '<div class="lb-val" style="text-align:right;color:var(--muted);font-size:.8rem">'
+        + (p.lastUpdatedOn ? new Date(p.lastUpdatedOn * 1000).toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : '—')
+        + '</div>'
+      + '<div></div>'
+      + '</div>';
+  }).join('');
 
-  const heads = {
-    batsmen:    ['Rank', 'Player', 'Rating', 'Country', '', ''],
-    bowlers:    ['Rank', 'Player', 'Rating', 'Country', '', ''],
-    allrounders:['Rank', 'Player', 'Rating', 'Country', '', ''],
-  };
-
-  return `
-    <div class="leaderboard">
-      <div class="lb-head">
-        <span>#</span><span>Player</span>
-        <span style="text-align:right">Rating</span>
-        <span style="text-align:right">Country</span>
-        <span></span><span></span>
-      </div>
-      ${players.slice(0, 20).map((p, i) => `
-        <div class="lb-row" style="animation-delay:${i * 0.04}s">
-          <span class="lb-rank ${rankClass(i)}">${p.rank || i + 1}</span>
-          <div class="lb-player">
-            <div class="lb-avatar">${initials(p.name)}</div>
-            <div>
-              <div class="lb-name">${p.name || '—'}</div>
-              <div class="lb-country">${p.country || '—'}</div>
-            </div>
-          </div>
-          <div class="lb-val highlight" style="text-align:right">${p.rating || '—'}</div>
-          <div class="lb-val" style="text-align:right">${p.country || '—'}</div>
-          <div></div><div></div>
-        </div>`).join('')}
-    </div>`;
+  return '<div class="leaderboard">'
+    + '<div class="lb-head">'
+    + '<span>#</span><span>Player</span>'
+    + '<span style="text-align:right">Rating</span>'
+    + '<span style="text-align:right">Points</span>'
+    + '<span style="text-align:right">Updated</span>'
+    + '<span></span>'
+    + '</div>'
+    + rows + '</div>';
 }
 
-const wrap = document.getElementById('rankingsWrap');
-
-async function loadRankings() {
+function loadRankings() {
+  var wrap = document.getElementById('rankingsWrap');
+  if (!wrap) return;
   wrap.innerHTML = loadingHTML('Fetching ICC rankings');
-  if (API_KEY === 'YOUR_CRICAPI_KEY') { wrap.innerHTML = apiKeyNote(); return; }
-  try {
-    const data = await fetchCricAPI('stats', { type: currentRole, matchType: currentFormat });
-    const players = data.data || [];
+
+  if (RAPIDAPI_KEY === 'YOUR_NEW_RAPIDAPI_KEY') { wrap.innerHTML = apiKeyNote(); return; }
+
+  fetchRankings(currentRole, currentFormat).then(function(data) {
+    var players = data.rank || [];
     wrap.innerHTML = renderRankings(players);
-  } catch (e) {
+  }).catch(function(e) {
     wrap.innerHTML = errorHTML('Could not load rankings · ' + e.message, 'loadRankings');
-    window.loadRankings = loadRankings;
-  }
+  });
+}
+
+// Recent completed matches via Cricbuzz
+function loadScorecards() {
+  var scWrap = document.getElementById('scorecardWrap');
+  if (!scWrap) return;
+
+  if (RAPIDAPI_KEY === 'YOUR_NEW_RAPIDAPI_KEY') { scWrap.innerHTML = apiKeyNote(); return; }
+
+  scWrap.innerHTML = loadingHTML('Fetching recent matches');
+
+  fetchRecentMatches().then(function(data) {
+    var matches = [];
+    var types   = data.typeMatches || [];
+    for (var i = 0; i < types.length; i++) {
+      var series = types[i].seriesMatches || [];
+      for (var j = 0; j < series.length; j++) {
+        var wrap2 = series[j].seriesAdWrapper || series[j];
+        var arr   = wrap2.matches || [];
+        for (var k = 0; k < arr.length; k++) matches.push(arr[k]);
+      }
+    }
+    matches = matches.slice(0, 6);
+
+    if (!matches.length) { scWrap.innerHTML = errorHTML('No recent matches found'); return; }
+
+    scWrap.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.5px">'
+      + matches.map(function(m) {
+          var info  = m.matchInfo  || {};
+          var score = m.matchScore || {};
+          var t1 = (info.team1 && (info.team1.teamSName || info.team1.teamName)) || 'TBA';
+          var t2 = (info.team2 && (info.team2.teamSName || info.team2.teamName)) || 'TBA';
+          var s1 = score.team1Score && score.team1Score.inngs1
+            ? score.team1Score.inngs1.runs + '/' + score.team1Score.inngs1.wickets + ' (' + score.team1Score.inngs1.overs + ')'
+            : '—';
+          var s2 = score.team2Score && score.team2Score.inngs1
+            ? score.team2Score.inngs1.runs + '/' + score.team2Score.inngs1.wickets + ' (' + score.team2Score.inngs1.overs + ')'
+            : '—';
+          var result = info.status || '';
+          return '<div class="match-card" style="padding:1.8rem">'
+            + '<div class="match-status completed">✓ Completed</div>'
+            + '<div style="font-weight:600;margin-bottom:.6rem">' + t1 + ' vs ' + t2 + '</div>'
+            + '<div style="font-size:.85rem;color:var(--muted);font-family:var(--font-cond);letter-spacing:1px;margin-bottom:.6rem;line-height:1.6">'
+            + t1 + ': ' + s1 + '<br>' + t2 + ': ' + s2 + '</div>'
+            + '<div style="font-size:.8rem;color:var(--accent)">' + result + '</div>'
+            + '</div>';
+        }).join('')
+      + '</div>';
+    observeCards();
+  }).catch(function(e) {
+    scWrap.innerHTML = errorHTML('Could not load scorecards · ' + e.message);
+  });
 }
 
 window.loadRankings = loadRankings;
 
-// Tabs
-document.querySelectorAll('#formatTabs .tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('#formatTabs .tab-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentFormat = btn.dataset.format;
-    loadRankings();
+document.addEventListener('DOMContentLoaded', function() {
+  loadRankings();
+  loadScorecards();
+
+  // Format tabs
+  document.querySelectorAll('#formatTabs .tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('#formatTabs .tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      currentFormat = btn.dataset.format;
+      loadRankings();
+    });
+  });
+
+  // Role tabs
+  document.querySelectorAll('#roleTabs .tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('#roleTabs .tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      currentRole = btn.dataset.role;
+      loadRankings();
+    });
   });
 });
-document.querySelectorAll('#roleTabs .tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('#roleTabs .tab-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentRole = btn.dataset.role;
-    loadRankings();
-  });
-});
-
-// Scorecard section - recent matches info
-const scWrap = document.getElementById('scorecardWrap');
-async function loadScorecards() {
-  scWrap.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.5px" id="scGrid">${loadingHTML()}</div>`;
-  if (API_KEY === 'YOUR_CRICAPI_KEY') { scWrap.innerHTML = apiKeyNote(); return; }
-  try {
-    const data = await fetchCricAPI('matches', { offset: 0 });
-    const matches = (data.data || []).filter(m => m.matchEnded).slice(0, 6);
-    if (!matches.length) { scWrap.innerHTML = errorHTML('No completed matches found'); return; }
-    scWrap.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.5px">` +
-      matches.map(m => {
-        const t1 = m.teams?.[0] || 'TBA', t2 = m.teams?.[1] || 'TBA';
-        const s1 = m.score?.[0] ? `${m.score[0].r}/${m.score[0].w} (${m.score[0].o})` : '—';
-        const s2 = m.score?.[1] ? `${m.score[1].r}/${m.score[1].w} (${m.score[1].o})` : '—';
-        return `<div class="match-card" style="padding:1.8rem">
-          <div class="match-status completed">✓ Completed</div>
-          <div style="font-weight:600;margin-bottom:.5rem">${t1} vs ${t2}</div>
-          <div style="font-size:.85rem;color:var(--muted);font-family:var(--font-cond);letter-spacing:1px;margin-bottom:.5rem">
-            ${t1}: ${s1}<br>${t2}: ${s2}
-          </div>
-          <div style="font-size:.8rem;color:var(--accent)">${m.status || ''}</div>
-        </div>`;
-      }).join('') + `</div>`;
-    observeCards();
-  } catch (e) {
-    scWrap.innerHTML = errorHTML('Could not load scorecards · ' + e.message);
-  }
-}
-
-loadRankings();
-loadScorecards();
 </script>
 </body>
 </html>
