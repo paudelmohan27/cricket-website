@@ -1,13 +1,16 @@
 /* ═══════════════════════════════════════════════════════
    CricVerse — script.js
    API: Cricbuzz via RapidAPI
-   ⚠  IMPORTANT: Generate your RapidAPI key at
-      rapidapi.com → My Apps → Generate Key
+   ⚠  IMPORTANT: Regenerate your RapidAPI key at
+      rapidapi.com → My Apps → Regenerate Key
       Then paste the NEW key below.
 ═══════════════════════════════════════════════════════ */
 
 // ── CONFIG ───────────────────────────────────────────────────
-var RAPIDAPI_KEY  = 'YOUR_NEW_RAPIDAPI_KEY'; 
+// ⚠ Do NOT put your real key here.
+// Add it as a GitHub secret named RAPIDAPI_KEY —
+// the Actions workflow injects it automatically at deploy time.
+var RAPIDAPI_KEY  = 'YOUR_NEW_RAPIDAPI_KEY';
 var RAPIDAPI_HOST = 'cricbuzz-cricket.p.rapidapi.com';
 var API_BASE      = 'https://cricbuzz-cricket.p.rapidapi.com';
 
