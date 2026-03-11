@@ -72,7 +72,7 @@
 <section id="matches" style="padding-top:0">
   <div class="section-label">Real-time</div>
   <h2 class="section-title">CURRENT <em>MATCHES</em></h2>
-  <p class="section-sub">Data from cricapi.com · Updates every 30 seconds. Click any live match to watch.</p>
+  <p class="section-sub">Data from Cricbuzz · Updates every 5 minutes. Click any live match to watch.</p>
   <div id="matchesGrid">
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.5px" id="matchesInner">
       <!-- populated by JS -->
@@ -133,7 +133,7 @@
 <section id="series" style="background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
   <div class="section-label">Competitions</div>
   <h2 class="section-title">CURRENT <em>SERIES</em></h2>
-  <p class="section-sub">Ongoing and upcoming international series from cricapi.com.</p>
+  <p class="section-sub">Ongoing and upcoming international series from Cricbuzz.</p>
   <div id="seriesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1.5px">
     <!-- populated by JS -->
   </div>
@@ -148,11 +148,16 @@
     <li><a href="about.html">About</a></li>
     <li><a href="contact.html">Contact</a></li>
   </ul>
-  <span class="footer-copy">© 2025 CricVerse · Data: cricapi.com</span>
+  <span class="footer-copy">© 2025 CricVerse · Data: Cricbuzz via RapidAPI</span>
 </footer>
 
 <script src="script.js"></script>
 <script>
+
+// ── CONFIG ───────────────────────────────────────────────────
+var REFRESH_INTERVAL = 5 * 60 * 1000;  // 5 minutes (saves API quota)
+var CACHE_TTL        = 4 * 60 * 1000;  // cache valid for 4 minutes
+var _refreshTimer    = null;
 
 // ── Country flag map ─────────────────────────────────────────
 var FLAGS = {
@@ -171,10 +176,23 @@ function countryEmoji(name) {
   return '🏏';
 }
 
-// ── Cricbuzz match card renderer ─────────────────────────────
-// Cricbuzz /matches/v1/live returns:
-// { typeMatches: [ { matchType, seriesMatches: [ { seriesAdWrapper: { matches: [ { matchInfo, matchScore } ] } } ] } ] }
+// ── Session cache (avoids re-fetching on tab switch / reload) ─
+function cacheSet(key, data) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data: data }));
+  } catch(e) {}
+}
+function cacheGet(key) {
+  try {
+    var raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    var obj = JSON.parse(raw);
+    if (Date.now() - obj.ts > CACHE_TTL) return null;
+    return obj.data;
+  } catch(e) { return null; }
+}
 
+// ── Flatten Cricbuzz nested match structure ───────────────────
 function flattenMatches(data) {
   var result = [];
   var types = data.typeMatches || [];
@@ -196,6 +214,7 @@ function getInningsScore(inngs) {
   return inngs.runs + '/' + inngs.wickets + ' (' + inngs.overs + ')';
 }
 
+// ── Match card renderer ───────────────────────────────────────
 function renderMatchCard(m, isLive) {
   var info  = m.matchInfo  || {};
   var score = m.matchScore || {};
@@ -214,7 +233,6 @@ function renderMatchCard(m, isLive) {
   var statusTxt = info.status || '';
   var stateCls  = isLive ? 'live' : (statusTxt ? 'completed' : 'upcoming');
   var stateLabel= isLive ? '● Live' : (statusTxt ? '✓ ' + statusTxt.split('.')[0] : '◎ Upcoming');
-
   var venue  = info.venueInfo ? (info.venueInfo.ground + ', ' + info.venueInfo.city) : '';
   var format = info.matchFormat || info.matchDesc || '';
   var series = info.seriesName || '';
@@ -246,7 +264,27 @@ function renderMatchCard(m, isLive) {
     + '</div>';
 }
 
-// ── Load all matches (live + upcoming + recent) ───────────────
+// ── Render matches from data (no API call) ────────────────────
+function renderMatchData(liveMatches, upcomingMatches) {
+  var innerGrid = document.getElementById('matchesInner');
+  if (!innerGrid) return;
+
+  buildTicker(liveMatches);
+  document.getElementById('liveCount').textContent  = liveMatches.length;
+  document.getElementById('totalCount').textContent = liveMatches.length + upcomingMatches.length;
+
+  var all = liveMatches.concat(upcomingMatches);
+  if (!all.length) {
+    innerGrid.innerHTML = '<div style="grid-column:1/-1">' + errorHTML('No matches found right now') + '</div>';
+    return;
+  }
+  var html = liveMatches.map(function(m) { return renderMatchCard(m, true); }).join('')
+           + upcomingMatches.map(function(m) { return renderMatchCard(m, false); }).join('');
+  innerGrid.innerHTML = html;
+  observeCards();
+}
+
+// ── Load matches (with cache + quota protection) ──────────────
 function loadMatches() {
   var innerGrid = document.getElementById('matchesInner');
   if (!innerGrid) return;
@@ -259,35 +297,26 @@ function loadMatches() {
     return;
   }
 
+  // Serve from cache if still fresh (no API call)
+  var cached = cacheGet('cv_matches');
+  if (cached) {
+    renderMatchData(cached.live, cached.upcoming);
+    scheduleRefresh();
+    return;
+  }
+
   innerGrid.innerHTML = '<div style="grid-column:1/-1">' + loadingHTML('Fetching live matches') + '</div>';
 
-  // Fetch live + upcoming in parallel
   Promise.all([fetchLiveMatches(), fetchUpcomingMatches()])
     .then(function(results) {
-      var liveData     = results[0];
-      var upcomingData = results[1];
+      var liveMatches     = flattenMatches(results[0]);
+      var upcomingMatches = flattenMatches(results[1]).slice(0, 6);
 
-      var liveMatches     = flattenMatches(liveData);
-      var upcomingMatches = flattenMatches(upcomingData).slice(0, 6);
+      // Cache it
+      cacheSet('cv_matches', { live: liveMatches, upcoming: upcomingMatches });
 
-      buildTicker(liveMatches);
-      document.getElementById('liveCount').textContent  = liveMatches.length;
-      document.getElementById('totalCount').textContent = liveMatches.length + upcomingMatches.length;
-
-      var allMatches = liveMatches.concat(upcomingMatches);
-
-      if (!allMatches.length) {
-        innerGrid.innerHTML = '<div style="grid-column:1/-1">' + errorHTML('No matches found right now') + '</div>';
-        return;
-      }
-
-      var liveHTML     = liveMatches.map(function(m) { return renderMatchCard(m, true); }).join('');
-      var upcomingHTML = upcomingMatches.map(function(m) { return renderMatchCard(m, false); }).join('');
-      innerGrid.innerHTML = liveHTML + upcomingHTML;
-      observeCards();
-
-      // Auto-refresh live scores every 30s
-      setTimeout(loadMatches, 30000);
+      renderMatchData(liveMatches, upcomingMatches);
+      scheduleRefresh();
     })
     .catch(function(e) {
       innerGrid.innerHTML = '<div style="grid-column:1/-1">'
@@ -296,7 +325,33 @@ function loadMatches() {
     });
 }
 
-// ── Load international series ────────────────────────────────
+// ── Smart refresh — pauses when tab is hidden ─────────────────
+function scheduleRefresh() {
+  if (_refreshTimer) clearTimeout(_refreshTimer);
+  _refreshTimer = setTimeout(function() {
+    // Only refresh if tab is visible — saves quota when user switches tabs
+    if (document.hidden) {
+      scheduleRefresh(); // reschedule, don't fetch
+    } else {
+      sessionStorage.removeItem('cv_matches'); // invalidate cache
+      loadMatches();
+    }
+  }, REFRESH_INTERVAL);
+}
+
+// Resume refresh when user comes back to the tab
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden) {
+    var cached = cacheGet('cv_matches');
+    if (!cached) {
+      // Cache expired while tab was hidden — fetch now
+      sessionStorage.removeItem('cv_matches');
+      loadMatches();
+    }
+  }
+});
+
+// ── Load international series (cached) ───────────────────────
 function loadSeries() {
   var seriesGrid = document.getElementById('seriesGrid');
   if (!seriesGrid) return;
@@ -306,11 +361,16 @@ function loadSeries() {
     return;
   }
 
+  // Series don't change often — cache for the session
+  var cached = cacheGet('cv_series');
+  if (cached) {
+    renderSeriesData(cached);
+    return;
+  }
+
   seriesGrid.innerHTML = loadingHTML('Fetching series');
 
   fetchSeries().then(function(data) {
-    // Cricbuzz /series/v1/international returns:
-    // { seriesMapProto: [ { date, series: [ { id, name } ] } ] }
     var groups = data.seriesMapProto || [];
     var list = [];
     for (var i = 0; i < groups.length; i++) {
@@ -320,21 +380,26 @@ function loadSeries() {
       }
     }
     list = list.slice(0, 12);
-
-    if (!list.length) { seriesGrid.innerHTML = errorHTML('No series found'); return; }
-
-    seriesGrid.innerHTML = list.map(function(s) {
-      return '<div class="match-card" style="padding:1.8rem">'
-        + '<div style="font-family:var(--font-cond);font-size:.65rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:.8rem">'
-        + (s.date || 'Ongoing') + '</div>'
-        + '<div style="font-weight:600;font-size:.95rem;margin-bottom:.5rem">' + (s.name || 'Unnamed Series') + '</div>'
-        + '<div style="font-size:.8rem;color:var(--muted);font-family:var(--font-cond);letter-spacing:1px">International Series</div>'
-        + '</div>';
-    }).join('');
-    observeCards();
+    cacheSet('cv_series', list);
+    renderSeriesData(list);
   }).catch(function(e) {
     seriesGrid.innerHTML = errorHTML('Could not load series · ' + e.message, 'loadSeries');
   });
+}
+
+function renderSeriesData(list) {
+  var seriesGrid = document.getElementById('seriesGrid');
+  if (!seriesGrid) return;
+  if (!list.length) { seriesGrid.innerHTML = errorHTML('No series found'); return; }
+  seriesGrid.innerHTML = list.map(function(s) {
+    return '<div class="match-card" style="padding:1.8rem">'
+      + '<div style="font-family:var(--font-cond);font-size:.65rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:.8rem">'
+      + (s.date || 'Ongoing') + '</div>'
+      + '<div style="font-weight:600;font-size:.95rem;margin-bottom:.5rem">' + (s.name || 'Unnamed Series') + '</div>'
+      + '<div style="font-size:.8rem;color:var(--muted);font-family:var(--font-cond);letter-spacing:1px">International Series</div>'
+      + '</div>';
+  }).join('');
+  observeCards();
 }
 
 window.loadMatches = loadMatches;
