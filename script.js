@@ -202,7 +202,7 @@ var DEFAULT_STREAMS = [
     name: 'Star Sports 1',
     desc: 'Star Sports Live HD',
     icon: '⭐',
-    url:  'https://pooembed.eu/embed/star-sports-1#player=clappr#autoplay=true',
+    url:  'https://yosintv100.pages.dev/shaka?id=sshindii',
   },
 ];
 
