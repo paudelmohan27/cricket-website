@@ -188,14 +188,14 @@ var DEFAULT_STREAMS = [
     name: 'Willow Cricket',
     desc: 'Official Willow TV',
     icon: '🏏',
-    url:  'https://pooembed.eu/embed/willow-cricket#player=clappr#autoplay=true',
+    url:  'https://yosintv100.pages.dev/shaka?id=ipl2',
   },
   {
     id:   'sony',
     name: 'Sony LIV Sports',
     desc: 'Sony Sports Network',
     icon: '📺',
-    url:  'https://pooembed.eu/embed/sonyliv-sports#player=clappr#autoplay=true',
+    url:  'https://yosintv100.pages.dev/shaka?id=ipl1,
   },
   {
     id:   'star',
