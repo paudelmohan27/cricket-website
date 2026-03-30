@@ -195,7 +195,7 @@ var DEFAULT_STREAMS = [
     name: 'Sony LIV Sports',
     desc: 'Sony Sports Network',
     icon: '📺',
-    url:  'https://yosintv100.pages.dev/shaka?id=ipl1,
+    url:  'https://yosintv100.pages.dev/shaka?id=ipl1',
   },
   {
     id:   'star',
