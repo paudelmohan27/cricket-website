@@ -184,18 +184,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
 var DEFAULT_STREAMS = [
   {
-    id:   'willow',
+    id:   'Himalaya Sports',
     name: 'Willow Cricket',
     desc: 'Official Willow TV',
     icon: '🏏',
-    url:  'https://yosintv100.pages.dev/shaka?id=ipl2',
+    url:  'https://him-edj.pages.dev/48e575e9-705f-44c4-bffe-7898176a7bbd',
   },
   {
-    id:   'sony',
+    id:   'Himalaya 2',
     name: 'Sony LIV Sports',
     desc: 'Sony Sports Network',
     icon: '📺',
-    url:  'https://yosintv100.pages.dev/shaka?id=ipl1',
+    url:  'https://him-edj.pages.dev/',
   },
   {
     id:   'star',
